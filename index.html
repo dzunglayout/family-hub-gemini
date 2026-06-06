@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #f4f6f9;
+      --card-bg: #ffffff;
+      --text-main: #2d3748;
+      --text-muted: #a0aec0;
+      --primary: #2196F3;
+      --danger: #e53e3e;
+      --success: #38a169;
+      --warning: #dd6b20;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); padding-bottom: 70px; }
+    
+    /* Header & User Select */
+    header { background: var(--card-bg); padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    select { padding: 8px; border-radius: 8px; border: 1px solid var(--text-muted); font-weight: 600; }
+
+    /* Layout chính dạng container */
+    .container { max-width: 600px; margin: 0 auto; padding: 15px; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* UI Phong cách Flashcard */
+    .flashcard { background: var(--card-bg); border-radius: 16px; padding: 16px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.02), 0 1px 3px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.03); }
+    .card-title { font-size: 14px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 8px; }
+    .card-value { font-size: 24px; font-weight: 700; }
+
+    /* Kho hàng slider */
+    .pantry-item { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 10px 0; border-bottom: 1px solid #edf2f7; }
+    .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+
+    /* Form Nhập liệu nhanh */
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
+    input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e0; font-size: 16px; }
+    button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+    /* Lớp bảo mật PIN */
+    .pin-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:999; }
+    .pin-input { width: 150px; text-align: center; font-size: 24px; letter-spacing: 10px; margin-bottom: 20px; }
+
+    /* Bottom Navigation Bar di động */
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: var(--card-bg); display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 99; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-muted); cursor: pointer; font-weight: 500; }
+    .nav-item.active { color: var(--primary); font-weight: 700; }
+    .nav-icon { font-size: 20px; margin-bottom: 2px; }
+
+    /* Desktop Grid Optimization */
+    @media (min-width: 768px) {
+      .container { max-width: 1000px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+      .page { display: block !important; }
+      .bottom-nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h2 style="font-size: 18px;">🏠 Nhà Mình App</h2>
+    <select id="userSelect" onchange="changeUser()">
+      <option value="Bố">Bố</option>
+      <option value="Mẹ">Mẹ</option>
+    </select>
+  </header>
+
+  <div id="pinPage" class="pin-overlay" style="display:none;">
+    <h3>Nhập mã PIN cá nhân</h3>
+    <p style="color:var(--text-muted); margin-bottom:15px;">Để vào khu vực ví tiền riêng tư</p>
+    <input type="password" id="pinCode" class="pin-input" maxlength="4" pattern="\d*">
+    <button style="width:120px;" onclick="verifyPin()">Xác nhận</button>
+  </div>
+
+  <div class="container">
+    <div id="tab-dashboard" class="page active">
+      <div class="flashcard" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div class="card-title" style="color: rgba(255,255,255,0.8);">Quỹ Chi Tiêu Chung Tháng Này</div>
+        <div class="card-value" id="totalShared">0 đ</div>
+      </div>
+      
+      <div class="flashcard">
+        <div class="card-title">Cảnh Báo Kho Nhu Yếu Phẩm</div>
+        <div id="pantryAlertList">Đang tải trạng thái kho...</div>
+      </div>
+    </div>
+
+    <div id="tab-finance" class="page">
+      <div class="flashcard">
+        <div class="card-title">Ghi chép giao dịch nhanh</div>
+        <div class="form-group">
+          <label>Số tiền</label>
+          <input type="number" id="txAmount" placeholder="đ">
+        </div>
+        <div class="form-group">
+          <label>Hạng mục</label>
+          <select id="txCategory">
+            <option value="Điện Nước">Điện Nước (Chung)</option>
+            <option value="Đi Chợ">Đi Chợ (Chung)</option>
+            <option value="Ăn uống riêng">Ăn uống (Cá nhân)</option>
+            <option value="Mua Sắm">Mua sắm (Cá nhân)</option>
+          </select>
+        </div>
+        <div class="form-group" style="display:flex; align-items:center; gap:10px; margin: 15px 0;">
+          <input type="checkbox" id="txIsChung" style="width:20px; height:20px;">
+          <label for="txIsChung" style="margin-bottom:0; font-size:14px;">Đây là khoản Chi Tiêu Chung</label>
+        </div>
+        <button onclick="saveTransaction()">Ghi Lên Google Sheet</button>
+      </div>
+    </div>
+
+    <div id="tab-pantry" class="page">
+      <div class="flashcard">
+        <div class="card-title">Tình Trạng Kho Nhu Yếu Phẩm</div>
+        <div id="pantryContainer"></div>
+      </div>
+    </div>
+
+    <div id="tab-notes" class="page">
+      <div class="flashcard">
+        <div class="card-title">Ghi Chú Gia Đình</div>
+        <div id="notesContainer">Đang tải ghi chú...</div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('dashboard')"><span class="nav-icon">📊</span>Dashboard</div>
+    <div class="nav-item" onclick="switchTab('finance')"><span class="nav-icon">💰</span>Thu Chi</div>
+    <div class="nav-item" onclick="switchTab('pantry')"><span class="nav-icon">📦</span>Kho Hàng</div>
+    <div class="nav-item" onclick="switchTab('notes')"><span class="nav-icon">📝</span>Ghi Chú</div>
+  </nav>
+
+  <script>
+    let appData = {};
+    let currentUser = "Bố";
+
+    window.onload = function() {
+      refreshData();
+    };
+
+    function refreshData() {
+      google.script.run.withSuccessHandler(function(data) {
+        appData = data;
+        renderDashboard();
+        renderPantry();
+        renderNotes();
+      }).getData();
+    }
+
+    function switchTab(tabName) {
+      // Logic phân quyền: Nếu vào tab tài chính cá nhân cần xác thực
+      if (tabName === 'finance') {
+        document.getElementById('pinPage').style.display = 'flex';
+        return;
+      }
+      executeTabSwitch(tabName);
+    }
+
+    function executeTabSwitch(tabName) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      
+      document.getElementById('tab-' + tabName).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    function verifyPin() {
+      let pin = document.getElementById('pinCode').value;
+      // Demo logic: check cứng mã 1234. Bạn có thể map động với bảng USER_CONFIG
+      if(pin === "1234") {
+        document.getElementById('pinPage').style.display = 'none';
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('tab-finance').classList.add('active');
+      } else {
+        alert("Sai mã PIN! Vui lòng thử lại.");
+        document.getElementById('pinCode').value = "";
+      }
+    }
+
+    function changeUser() {
+      currentUser = document.getElementById('userSelect').value;
+    }
+
+    function renderDashboard() {
+      let total = 0;
+      appData.transactions.forEach(t => {
+        if(t.Is_Chung === true || t.Is_Chung === "TRUE") {
+          total += Number(t.Số_Tiền);
+        }
+      });
+      document.getElementById('totalShared').innerText = total.toLocaleString('vi-VN') + " đ";
+    }
+
+    function renderPantry() {
+      let container = document.getElementById('pantryContainer');
+      let alertContainer = document.getElementById('pantryAlertList');
+      container.innerHTML = "";
+      alertContainer.innerHTML = "";
+
+      appData.pantry.forEach(item => {
+        let color = "var(--success)";
+        if(item.Phần_Trăm <= 30) color = "var(--danger)";
+        else if(item.Phần_Trăm <= 50) color = "var(--warning)";
+
+        let html = `
+          <div class="pantry-item">
+            <div>
+              <strong>${item.Tên_Món}</strong><br>
+              <small style="color:var(--text-muted)">Cập nhật: ${item.Ngày_Cập_Nhật}</small>
+            </div>
+            <div>
+              <span class="status-badge" style="background:${color}; color:white;">${item.Phần_Trăm}%</span>
+              <button style="width:35px; padding:2px; display:inline; margin-left:5px;" onclick="quickUpdatePantry('${item.Item_ID}', ${item.Phần_Trăm - 10})">-</button>
+              <button style="width:35px; padding:2px; display:inline;" onclick="quickUpdatePantry('${item.Item_ID}', 100)">⚡</button>
+            </div>
+          </div>
+        `;
+        container.innerHTML += html;
+
+        if(item.Phần_Trăm <= 30) {
+          alertContainer.innerHTML += `<p style="color:var(--danger); font-weight:600;">⚠️ ${item.Tên_Món} sắp hết (${item.Phần_Trăm}%)</p>`;
+        }
+      });
+      if(alertContainer.innerHTML === "") alertContainer.innerHTML = "✨ Các mặt hàng nhu yếu phẩm vẫn đầy đủ!";
+    }
+
+    function quickUpdatePantry(id, current) {
+      if(current < 0) current = 0;
+      google.script.run.withSuccessHandler(function() {
+        refreshData();
+      }).updatePantry(id, current);
+    }
+
+    function saveTransaction() {
+      let amount = document.getElementById('txAmount').value;
+      let category = document.getElementById('txCategory').value;
+      let isChung = document.getElementById('txIsChung').checked;
+
+      if(!amount) return alert("Vui lòng nhập số tiền");
+
+      let data = {
+        user: currentUser,
+        amount: amount,
+        category: category,
+        account: "Ví/Thẻ",
+        isChung: isChung ? "TRUE" : "FALSE"
+      };
+
+      google.script.run.withSuccessHandler(function() {
+        alert("Ghi nhận thành công!");
+        document.getElementById('txAmount').value = "";
+        refreshData();
+        switchTab('dashboard');
+      }).addTransaction(data);
+    }
+
+    function renderNotes() {
+      let container = document.getElementById('notesContainer');
+      container.innerHTML = "";
+      appData.notes.forEach(n => {
+        container.innerHTML += `
+          <div style="margin-bottom:10px; padding:10px; border-left:4px solid var(--primary); background:#f8f9fa">
+            <strong>${n.Tiêu_Đề}</strong><br><small>${n.Nội_Dung}</small>
+          </div>
+        `;
+      });
+    }
+  </script>
+</body>
+</html>
